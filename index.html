@@ -1,0 +1,2589 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ARBITER — The decision engine for your infrastructure.</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400&family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+  <script>
+    const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+      "accent": "#7CFFB2",
+      "bg": "#070908",
+      "motion": 80,
+      "centerpiece": "telemetry",
+      "showGrid": false,
+      "palette": [
+        "#E6E6E6",
+        "#0a0a0a"
+      ]
+    }/*EDITMODE-END*/;
+    window.__TWEAK_DEFAULTS = TWEAK_DEFAULTS;
+  </script>
+
+  <style>
+    :root {
+      --bg: #070908;
+      --bg-2: #0d1110;
+      --bg-3: #141917;
+      --line: #1f2622;
+      --line-2: #2a332e;
+      --ink: #e8eee9;
+      --ink-2: #b6bdb7;
+      --ink-3: #6b736d;
+      --ink-4: #3d433f;
+      --accent: #7CFFB2;
+      --accent-dim: #4ea878;
+      --warn: #ffb86b;
+      --danger: #ff7a6b;
+      --serif: "Fraunces", "Times New Roman", serif;
+      --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+      --maxw: 1280px;
+      --gutter: clamp(20px, 4vw, 56px);
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--ink);
+      font-family: var(--mono);
+      font-size: 14px;
+      line-height: 1.55;
+      letter-spacing: 0.01em;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+
+    a { color: inherit; text-decoration: none; }
+    button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+
+    /* ============ Background grid ============ */
+    .bg-grid {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      background-image:
+        linear-gradient(to right, rgba(124,255,178,0.028) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(124,255,178,0.028) 1px, transparent 1px);
+      background-size: 72px 72px;
+      mask-image: radial-gradient(ellipse 75% 55% at 50% 30%, #000 25%, transparent 78%);
+      -webkit-mask-image: radial-gradient(ellipse 75% 55% at 50% 30%, #000 25%, transparent 78%);
+    }
+    .bg-noise {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 1;
+      opacity: 0.28;
+      mix-blend-mode: overlay;
+      background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.5 0 0 0 0 0.5 0 0 0 0 0.5 0 0 0 0.08 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+    }
+    .bg-glow {
+      position: fixed;
+      width: 1100px; height: 1100px;
+      top: -300px; left: 50%;
+      transform: translateX(-50%);
+      pointer-events: none;
+      z-index: 0;
+      background: radial-gradient(circle at center, rgba(124,255,178,0.07), transparent 60%);
+      filter: blur(20px);
+    }
+
+    /* ============ Top nav ============ */
+    .topbar {
+      position: relative;
+      z-index: 10;
+      max-width: var(--maxw);
+      margin: 0 auto;
+      padding: 22px var(--gutter);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-family: var(--serif);
+      font-size: 22px;
+      font-weight: 500;
+      letter-spacing: -0.01em;
+    }
+    .brand-mark {
+      width: 28px; height: 28px;
+      position: relative;
+      flex-shrink: 0;
+    }
+    .brand-mark svg { width: 100%; height: 100%; display: block; }
+    .brand-mark .ring {
+      transform-origin: center;
+      animation: spin 18s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .brand-tag {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--ink-3);
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      padding: 3px 8px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+    }
+    .nav-links {
+      display: flex;
+      gap: 28px;
+      font-size: 12px;
+      color: var(--ink-2);
+    }
+    .nav-links a {
+      position: relative;
+      transition: color .2s;
+    }
+    .nav-links a:hover { color: var(--accent); }
+    .nav-links a::before {
+      content: attr(data-num);
+      font-size: 9px;
+      color: var(--ink-4);
+      margin-right: 6px;
+    }
+    .nav-cta {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 16px;
+      border: 1px solid var(--line-2);
+      border-radius: 6px;
+      font-size: 12px;
+      letter-spacing: 0.04em;
+      transition: all .18s ease;
+      background: transparent;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .btn:hover { border-color: var(--accent); color: var(--accent); }
+    .btn-ghost {
+      border-color: transparent;
+      color: var(--ink-2);
+      padding: 9px 14px;
+    }
+    .btn-ghost:hover {
+      color: var(--ink);
+      border-color: var(--line-2);
+      background: rgba(255,255,255,0.02);
+    }
+    .btn-arrow {
+      display: inline-block;
+      transition: transform .2s ease;
+    }
+    .btn-ghost:hover .btn-arrow { transform: translateX(2px); }
+    .btn-primary {
+      background: var(--accent);
+      color: #062014;
+      border-color: var(--accent);
+      font-weight: 500;
+      padding: 10px 18px;
+      box-shadow: 0 0 0 0 rgba(124,255,178,0), 0 1px 0 rgba(255,255,255,0.15) inset;
+      position: relative;
+    }
+    .btn-primary:hover {
+      background: #9affc7;
+      color: #062014;
+      box-shadow: 0 0 0 4px rgba(124,255,178,0.18), 0 1px 0 rgba(255,255,255,0.2) inset;
+      transform: translateY(-1px);
+    }
+    .btn .dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 8px var(--accent);
+      animation: pulse 1.6s ease-in-out infinite;
+    }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+    @media (max-width: 800px) {
+      .nav-links { display: none; }
+    }
+
+    /* ============ HERO ============ */
+    .hero {
+      position: relative;
+      z-index: 5;
+      max-width: var(--maxw);
+      margin: 0 auto;
+      padding: 32px var(--gutter) 0;
+      display: grid;
+      grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+      gap: 56px;
+      align-items: stretch;
+      min-height: 78vh;
+    }
+    @media (max-width: 1000px) {
+      .hero {
+        grid-template-columns: 1fr;
+        gap: 40px;
+      }
+    }
+
+    .hero-eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 11px;
+      color: var(--ink-2);
+      text-transform: uppercase;
+      letter-spacing: 0.22em;
+      padding: 6px 12px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255,255,255,0.02);
+      backdrop-filter: blur(4px);
+    }
+    .hero-eyebrow .dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 8px var(--accent);
+      animation: pulse 1.6s ease-in-out infinite;
+    }
+
+    .hero-title {
+      font-family: var(--serif);
+      font-weight: 300;
+      font-variation-settings: "opsz" 144, "SOFT" 50;
+      font-size: clamp(48px, 7.4vw, 104px);
+      line-height: 0.96;
+      letter-spacing: -0.035em;
+      margin: 28px 0 0;
+      color: var(--ink);
+    }
+    .hero-title em {
+      font-style: italic;
+      font-weight: 300;
+      color: var(--accent);
+      position: relative;
+    }
+    .hero-title em::after {
+      content: "";
+      position: absolute;
+      left: 0; right: 0;
+      bottom: 0.04em;
+      height: 1px;
+      background: var(--accent-dim);
+      opacity: 0.4;
+    }
+    .hero-title sup {
+      font-family: var(--mono);
+      font-size: 0.18em;
+      font-weight: 400;
+      vertical-align: super;
+      color: var(--ink-3);
+      letter-spacing: 0;
+    }
+
+    .hero-sub {
+      font-family: var(--serif);
+      font-weight: 300;
+      font-size: clamp(17px, 1.5vw, 21px);
+      line-height: 1.45;
+      color: var(--ink-2);
+      max-width: 52ch;
+      margin: 28px 0 0;
+      letter-spacing: -0.005em;
+    }
+    .hero-sub strong {
+      color: var(--ink);
+      font-weight: 400;
+    }
+
+    .hero-lists {
+      display: grid;
+      grid-template-columns: max-content max-content;
+      gap: 48px;
+      margin: 32px 0 0;
+    }
+    .hero-list-k {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 12px;
+    }
+    .hero-list ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .hero-list li {
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 400;
+      color: var(--ink-2);
+      letter-spacing: 0.06em;
+      text-transform: lowercase;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0;
+      line-height: 1.6;
+    }
+    .hl-dot {
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 6px var(--accent);
+      flex-shrink: 0;
+      animation: hlPulse 2.4s ease-in-out infinite;
+    }
+    .hero-list li:nth-child(2) .hl-dot { animation-delay: 0.3s; }
+    .hero-list li:nth-child(3) .hl-dot { animation-delay: 0.6s; }
+    .hero-list li:nth-child(4) .hl-dot { animation-delay: 0.9s; }
+    @keyframes hlPulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.35; }
+    }
+    .hl-key {
+      color: var(--ink);
+    }
+
+    .hero-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0;
+      margin-top: 40px;
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+    }
+    .stat {
+      padding: 18px 0;
+      border-right: 1px solid var(--line);
+    }
+    .stat:last-child { border-right: 0; padding-left: 18px; }
+    .stat:nth-child(2) { padding-left: 18px; }
+    .stat-label {
+      font-size: 10px;
+      color: var(--ink-3);
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+    }
+    .stat-value {
+      font-family: var(--serif);
+      font-weight: 300;
+      font-size: 38px;
+      line-height: 1;
+      letter-spacing: -0.02em;
+      margin-top: 8px;
+      color: var(--ink);
+      font-variant-numeric: tabular-nums;
+    }
+    .stat-value .unit {
+      font-family: var(--mono);
+      font-size: 12px;
+      font-weight: 400;
+      color: var(--ink-3);
+      margin-left: 6px;
+      letter-spacing: 0;
+    }
+
+    .hero-cta {
+      margin-top: 36px;
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .hero-cta-note {
+      font-size: 11px;
+      color: var(--ink-3);
+      letter-spacing: 0.04em;
+    }
+    .hero-cta-note .key {
+      display: inline-block;
+      padding: 2px 6px;
+      border: 1px solid var(--line-2);
+      border-radius: 4px;
+      font-size: 10px;
+      color: var(--ink-2);
+      margin: 0 3px;
+    }
+
+    /* ============ Hero centerpiece ============ */
+    .centerpiece {
+      position: relative;
+      align-self: stretch;
+      min-height: 580px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .panel {
+      position: relative;
+      background: linear-gradient(180deg, rgba(13,17,16,0.92), rgba(7,9,8,0.92));
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      backdrop-filter: blur(6px);
+      overflow: hidden;
+    }
+    .panel::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: radial-gradient(120% 60% at 50% 0%, rgba(124,255,178,0.08), transparent 60%);
+    }
+    .panel-corners::after {
+      content: "";
+      position: absolute;
+      inset: 8px;
+      pointer-events: none;
+      background:
+        linear-gradient(to right, var(--accent) 0, var(--accent) 14px, transparent 14px) top left/100% 1px no-repeat,
+        linear-gradient(to right, var(--accent) calc(100% - 14px), transparent calc(100% - 14px)) top right/100% 1px no-repeat,
+        linear-gradient(to bottom, var(--accent) 0, var(--accent) 14px, transparent 14px) top left/1px 100% no-repeat,
+        linear-gradient(to bottom, transparent calc(100% - 14px), var(--accent) calc(100% - 14px)) bottom left/1px 100% no-repeat,
+        linear-gradient(to bottom, var(--accent) 0, var(--accent) 14px, transparent 14px) top right/1px 100% no-repeat,
+        linear-gradient(to bottom, transparent calc(100% - 14px), var(--accent) calc(100% - 14px)) bottom right/1px 100% no-repeat,
+        linear-gradient(to right, var(--accent) 0, var(--accent) 14px, transparent 14px) bottom left/100% 1px no-repeat,
+        linear-gradient(to right, var(--accent) calc(100% - 14px), transparent calc(100% - 14px)) bottom right/100% 1px no-repeat;
+      opacity: 0.5;
+    }
+
+    .panel-bar {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--line);
+      font-size: 10px;
+      color: var(--ink-3);
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      background: rgba(0,0,0,0.3);
+      white-space: nowrap;
+      overflow: hidden;
+    }
+    .panel-bar > span:nth-child(2) {
+      text-align: center;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-width: 0;
+    }
+    .panel-bar .bullets {
+      display: flex; gap: 6px;
+    }
+    .panel-bar .bullets span {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--ink-4);
+    }
+    .panel-bar .bullets span:nth-child(1) { background: #ff6b6b; }
+    .panel-bar .bullets span:nth-child(2) { background: #ffb86b; }
+    .panel-bar .bullets span:nth-child(3) { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+    .panel-bar .live {
+      display: inline-flex; align-items: center; gap: 6px;
+      color: var(--accent);
+    }
+    .panel-bar .live .dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 6px var(--accent);
+      animation: pulse 1.4s ease-in-out infinite;
+    }
+
+    /* === Telemetry panel (main) === */
+    .telemetry {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+    .telemetry-body {
+      padding: 18px;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      gap: 18px;
+      flex: 1;
+    }
+
+    .counter-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: end;
+      gap: 18px;
+    }
+    .counter-label {
+      font-size: 10px;
+      color: var(--ink-3);
+      text-transform: uppercase;
+      letter-spacing: 0.2em;
+    }
+    .counter {
+      font-family: var(--serif);
+      font-weight: 300;
+      font-size: clamp(54px, 6vw, 84px);
+      line-height: 1;
+      letter-spacing: -0.03em;
+      color: var(--accent);
+      font-variant-numeric: tabular-nums;
+      text-shadow: 0 0 24px rgba(124,255,178,0.25);
+      margin-top: 6px;
+    }
+    .counter .currency {
+      font-size: 0.5em;
+      color: var(--accent-dim);
+      vertical-align: 0.32em;
+      margin-right: 4px;
+    }
+    .counter-side {
+      text-align: right;
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--ink-3);
+      line-height: 1.5;
+    }
+    .counter-side .delta {
+      color: var(--accent);
+      font-size: 13px;
+      font-weight: 500;
+    }
+    .counter-side .arrow {
+      display: inline-block;
+      transform: translateY(-1px);
+    }
+
+    /* Chart */
+    .chart-wrap {
+      position: relative;
+      width: 100%;
+      height: 180px;
+    }
+    .chart-wrap svg { width: 100%; height: 100%; display: block; }
+    .chart-axis {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+    .chart-y, .chart-x {
+      position: absolute;
+      font-family: var(--mono);
+      font-size: 9px;
+      color: var(--ink-4);
+      letter-spacing: 0.04em;
+    }
+    .chart-y { left: 0; top: 0; bottom: 0; width: 44px; }
+    .chart-y span {
+      position: absolute;
+      right: 6px;
+    }
+    .chart-x {
+      left: 44px; right: 0; bottom: -2px;
+      display: flex;
+      justify-content: space-between;
+    }
+    .chart-legend {
+      display: flex;
+      gap: 18px;
+      font-size: 10px;
+      color: var(--ink-2);
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      align-items: center;
+    }
+    .chart-legend .swatch {
+      display: inline-block;
+      width: 14px; height: 2px;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+    .chart-legend .swatch.dashed {
+      background: repeating-linear-gradient(90deg, var(--ink-3) 0 4px, transparent 4px 7px);
+    }
+    .chart-legend .swatch.solid {
+      background: var(--accent);
+      box-shadow: 0 0 6px var(--accent);
+    }
+
+    /* Sub-stats */
+    .substats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1px;
+      background: var(--line);
+      border-radius: 6px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+    }
+    .substat {
+      background: rgba(7,9,8,0.7);
+      padding: 12px 14px;
+    }
+    .substat-k {
+      font-size: 9px;
+      color: var(--ink-3);
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+    }
+    .substat-v {
+      font-family: var(--serif);
+      font-weight: 300;
+      font-size: 22px;
+      letter-spacing: -0.02em;
+      margin-top: 4px;
+      color: var(--ink);
+      font-variant-numeric: tabular-nums;
+    }
+    .substat-v .u {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--ink-3);
+      margin-left: 4px;
+    }
+    .substat-trend {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--accent);
+      margin-top: 2px;
+    }
+
+    /* Stream / log readout below */
+    .stream {
+      margin-top: 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(0,0,0,0.4);
+      font-family: var(--mono);
+      font-size: 11px;
+      overflow: hidden;
+      max-height: 180px;
+    }
+    .stream-head {
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--line);
+      color: var(--ink-3);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      display: flex;
+      justify-content: space-between;
+    }
+    .stream-list {
+      list-style: none;
+      margin: 0; padding: 0;
+      max-height: 132px;
+      overflow: hidden;
+    }
+    .stream-list li {
+      padding: 5px 12px;
+      display: grid;
+      grid-template-columns: 60px 80px 1fr auto;
+      gap: 10px;
+      color: var(--ink-2);
+      border-bottom: 1px dashed rgba(31,38,34,0.6);
+      align-items: center;
+      animation: slideIn .4s ease;
+    }
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(-6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .stream-list li .t { color: var(--ink-4); }
+    .stream-list li .m { color: var(--accent-dim); }
+    .stream-list li .save { color: var(--accent); text-align: right; }
+
+    /* ============ Orchestrator ============ */
+    .orchestrator {
+      position: relative;
+      z-index: 5;
+      max-width: var(--maxw);
+      margin: 80px auto 60px;
+      padding: 0 var(--gutter);
+    }
+    .orch-head { margin-bottom: 28px; }
+    .orch-meta {
+      font-family: var(--mono);
+      font-size: 10.5px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--ink-3);
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+    .orch-num { color: var(--accent); }
+    .orch-sep { color: var(--ink-4); }
+    .orch-pulse { display: inline-flex; align-items: center; gap: 8px; color: var(--ink-2); }
+    .pdot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 10px var(--accent);
+      animation: hlPulse 1.6s ease-in-out infinite;
+    }
+    .orch-clock { color: var(--ink-3); font-variant-numeric: tabular-nums; }
+    .orch-title {
+      font-family: var(--serif);
+      font-weight: 300;
+      font-size: clamp(26px, 2.6vw, 38px);
+      letter-spacing: -0.02em;
+      color: var(--ink);
+      margin: 0;
+      max-width: 28ch;
+      line-height: 1.15;
+    }
+    .orch-title em {
+      font-style: italic;
+      color: var(--accent);
+      font-weight: 400;
+    }
+
+    .orch-stage {
+      display: grid;
+      grid-template-columns: 0.85fr 1fr 1.25fr;
+      gap: 1px;
+      background: var(--line);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      overflow: hidden;
+      background-image:
+        linear-gradient(180deg, rgba(13,17,16,0.6), rgba(7,9,8,0.85));
+    }
+    @media (max-width: 1000px) {
+      .orch-stage { grid-template-columns: 1fr; }
+    }
+    .orch-col {
+      background: var(--bg);
+      padding: 22px 22px 24px;
+      display: flex;
+      flex-direction: column;
+      min-height: 380px;
+    }
+    .col-label {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--ink-3);
+      margin-bottom: 18px;
+    }
+
+    /* Job card */
+    .job-card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 16px;
+      background: linear-gradient(180deg, rgba(124,255,178,0.025), transparent);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      transition: border-color .4s ease, box-shadow .4s ease;
+    }
+    .job-card.is-active {
+      border-color: rgba(124,255,178,0.35);
+      box-shadow: 0 0 0 1px rgba(124,255,178,0.08), 0 0 24px rgba(124,255,178,0.06);
+    }
+    .job-line { display: flex; align-items: baseline; gap: 10px; }
+    .job-tag {
+      font-family: var(--mono); font-size: 9px; letter-spacing: 0.22em;
+      text-transform: uppercase; color: var(--accent);
+      border: 1px solid var(--line-2); border-radius: 3px;
+      padding: 2px 6px;
+    }
+    .job-id {
+      font-family: var(--mono); font-size: 13px; color: var(--ink);
+      letter-spacing: -0.01em;
+      transition: opacity .25s;
+    }
+    .job-row {
+      display: flex; justify-content: space-between; align-items: baseline;
+      font-family: var(--mono); font-size: 11px;
+      padding-top: 6px;
+    }
+    .job-row .k { color: var(--ink-3); letter-spacing: 0.06em; text-transform: uppercase; font-size: 9.5px; }
+    .job-row .v { color: var(--ink-2); }
+    .job-divider { height: 1px; background: var(--line); margin: 4px 0; }
+    .job-status {
+      display: flex; align-items: center; gap: 8px;
+      font-family: var(--mono); font-size: 10.5px; color: var(--ink-2);
+      letter-spacing: 0.04em;
+    }
+    .sdot { width: 5px; height: 5px; border-radius: 50%; background: var(--ink-3); transition: background .3s, box-shadow .3s; }
+    .job-status.is-routing .sdot { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+    .job-status.is-routing { color: var(--accent); }
+
+    /* Dimension list */
+    .dim-list {
+      list-style: none; padding: 0; margin: 0;
+      display: flex; flex-direction: column; gap: 4px;
+      flex: 1;
+    }
+    .dim-list li {
+      display: grid;
+      grid-template-columns: 22px 1fr auto 16px;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 10px;
+      border-radius: 6px;
+      font-family: var(--mono);
+      transition: background .35s ease, color .35s ease;
+      opacity: 0.55;
+    }
+    .dim-list li.is-active {
+      opacity: 1;
+      background: rgba(124,255,178,0.04);
+      box-shadow: inset 0 0 0 1px rgba(124,255,178,0.18);
+    }
+    .dim-list li.is-done { opacity: 0.85; }
+    .dim-idx { font-size: 9px; color: var(--ink-4); letter-spacing: 0.1em; }
+    .dim-list li.is-active .dim-idx, .dim-list li.is-done .dim-idx { color: var(--accent); }
+    .dim-k {
+      font-size: 11px; color: var(--ink-2);
+      letter-spacing: 0.08em; text-transform: lowercase;
+    }
+    .dim-list li.is-active .dim-k { color: var(--ink); }
+    .dim-v {
+      font-size: 11px; color: var(--ink-3);
+      transition: color .3s, opacity .3s;
+    }
+    .dim-list li.is-active .dim-v, .dim-list li.is-done .dim-v { color: var(--ink); }
+    .dim-state {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--ink-4);
+      transition: background .3s, box-shadow .3s, transform .3s;
+    }
+    .dim-list li.is-active .dim-state {
+      background: var(--accent);
+      box-shadow: 0 0 8px var(--accent);
+      animation: hlPulse 1.2s ease-in-out infinite;
+    }
+    .dim-list li.is-done .dim-state {
+      background: var(--accent-dim);
+      box-shadow: 0 0 4px var(--accent-dim);
+    }
+    .dim-progress {
+      height: 1px; background: var(--line);
+      margin-top: 14px; overflow: hidden; position: relative;
+    }
+    .dim-progress i {
+      display: block; height: 100%; width: 0;
+      background: linear-gradient(90deg, transparent, var(--accent));
+      transition: width .6s cubic-bezier(.4,0,.2,1);
+    }
+
+    /* Route map */
+    .orch-col-routes { padding-bottom: 22px; }
+    .route-wrap { flex: 1; display: flex; flex-direction: column; }
+    .route-svg { width: 100%; height: 100%; min-height: 300px; flex: 1; }
+    .src-label {
+      font-family: var(--mono); font-size: 9px;
+      fill: var(--ink-3); letter-spacing: 0.18em;
+      text-transform: uppercase;
+    }
+    .src-group circle:nth-child(3) {
+      transform-origin: 40px 180px;
+      animation: srcRing 3s ease-out infinite;
+    }
+    @keyframes srcRing {
+      0% { transform: scale(0.6); opacity: 0.7; }
+      100% { transform: scale(2.4); opacity: 0; }
+    }
+
+    .route-line {
+      fill: none;
+      stroke: var(--line-2);
+      stroke-width: 1;
+      transition: stroke .5s, stroke-width .5s, opacity .5s;
+    }
+    .route-line.is-cand { stroke: rgba(124,255,178,0.35); }
+    .route-line.is-rej { stroke: var(--line-2); opacity: 0.4; stroke-dasharray: 2 4; }
+    .route-line.is-active {
+      stroke: url(#lineGrad);
+      stroke-width: 1.6;
+      opacity: 1;
+    }
+    .route-flow {
+      stroke: var(--accent);
+      stroke-width: 1.8;
+      stroke-dasharray: 6 200;
+      stroke-dashoffset: 0;
+      opacity: 0;
+      filter: drop-shadow(0 0 4px rgba(124,255,178,0.6));
+      transition: opacity .4s;
+    }
+    .route-flow.is-on {
+      opacity: 1;
+      animation: flow 2.4s linear infinite;
+    }
+    @keyframes flow { to { stroke-dashoffset: -206; } }
+
+    .node rect {
+      fill: var(--bg-2);
+      stroke: var(--line-2);
+      stroke-width: 1;
+      transition: stroke .4s, fill .4s, filter .4s;
+    }
+    .node .n-name {
+      font-family: var(--mono); font-size: 10px;
+      fill: var(--ink-2); letter-spacing: 0.04em;
+      text-anchor: middle;
+    }
+    .node .n-region {
+      font-family: var(--mono); font-size: 8.5px;
+      fill: var(--ink-3); letter-spacing: 0.06em;
+      text-anchor: middle;
+    }
+    .node .n-dot {
+      fill: var(--ink-4);
+      transition: fill .4s, r .4s;
+    }
+    .node.is-cand rect { stroke: rgba(124,255,178,0.35); }
+    .node.is-cand .n-dot { fill: var(--accent-dim); }
+    .node.is-rej { opacity: 0.45; }
+    .node.is-active rect {
+      stroke: var(--accent);
+      fill: rgba(124,255,178,0.06);
+      filter: drop-shadow(0 0 12px rgba(124,255,178,0.25));
+    }
+    .node.is-active .n-name { fill: var(--ink); }
+    .node.is-active .n-region { fill: var(--accent); }
+    .node.is-active .n-dot { fill: var(--accent); }
+
+    .route-legend {
+      display: flex; gap: 18px;
+      font-family: var(--mono); font-size: 9.5px;
+      letter-spacing: 0.14em; text-transform: uppercase;
+      color: var(--ink-3);
+      padding-top: 10px; margin-top: 10px;
+      border-top: 1px solid var(--line);
+    }
+    .route-legend span { display: inline-flex; align-items: center; gap: 6px; }
+    .lg-dot { width: 6px; height: 6px; border-radius: 50%; }
+    .lg-active { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+    .lg-cand { background: var(--accent-dim); }
+    .lg-rej { background: var(--ink-4); }
+
+    /* Telemetry */
+    .orch-tele {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr) 1.4fr;
+      gap: 1px;
+      background: var(--line);
+      border: 1px solid var(--line);
+      border-top: none;
+      border-radius: 0 0 12px 12px;
+      margin-top: -1px;
+    }
+    @media (max-width: 1000px) {
+      .orch-tele { grid-template-columns: 1fr 1fr; }
+    }
+    .tele {
+      background: var(--bg);
+      padding: 16px 18px 18px;
+      display: flex; flex-direction: column; gap: 6px;
+    }
+    .tele-k {
+      font-family: var(--mono); font-size: 9.5px;
+      letter-spacing: 0.18em; text-transform: uppercase;
+      color: var(--ink-3);
+    }
+    .tele-v {
+      font-family: var(--serif); font-weight: 300;
+      font-size: 26px; line-height: 1; letter-spacing: -0.02em;
+      color: var(--ink); font-variant-numeric: tabular-nums;
+    }
+    .tele-v .cu {
+      font-family: var(--mono); font-size: 11px; color: var(--ink-3);
+      margin-left: 4px; letter-spacing: 0.04em;
+    }
+    .tele-d {
+      font-family: var(--mono); font-size: 10px; color: var(--ink-3);
+      letter-spacing: 0.04em;
+    }
+    .tele-bar { height: 2px; background: var(--bg-3); border-radius: 2px; overflow: hidden; margin-top: 4px; }
+    .tele-bar i {
+      display: block; height: 100%; width: 30%;
+      background: linear-gradient(90deg, var(--accent-dim), var(--accent));
+      transition: width 1s cubic-bezier(.4,0,.2,1);
+    }
+    .tele-utl .utl-rows { display: flex; flex-direction: column; gap: 4px; margin-top: 2px; }
+    .utl {
+      display: grid; grid-template-columns: 70px 1fr 24px;
+      align-items: center; gap: 10px;
+      font-family: var(--mono); font-size: 10px;
+    }
+    .utl span { color: var(--ink-3); letter-spacing: 0.04em; }
+    .utl i { height: 2px; background: var(--bg-3); border-radius: 2px; position: relative; }
+    .utl i::after {
+      content: ''; position: absolute; left: 0; top: 0; bottom: 0;
+      width: calc(var(--w) * 100%);
+      background: linear-gradient(90deg, var(--accent-dim), var(--accent));
+      border-radius: 2px;
+      transition: width 1s cubic-bezier(.4,0,.2,1);
+    }
+    .utl b { color: var(--ink-2); font-weight: 400; text-align: right; }
+
+    /* ============ Marquee strip ============ */
+    .marquee {
+      position: relative;
+      z-index: 5;
+      margin-top: 80px;
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      overflow: hidden;
+      background: rgba(0,0,0,0.3);
+    }
+    .marquee-track {
+      display: flex;
+      gap: 64px;
+      padding: 18px 0;
+      white-space: nowrap;
+      animation: marquee 38s linear infinite;
+      width: max-content;
+    }
+    .marquee-track span {
+      font-family: var(--serif);
+      font-style: italic;
+      font-weight: 300;
+      font-size: 22px;
+      color: var(--ink-2);
+      letter-spacing: -0.01em;
+      display: inline-flex;
+      align-items: center;
+      gap: 64px;
+    }
+    .marquee-track span::after {
+      content: "✦";
+      color: var(--accent);
+      font-style: normal;
+      font-size: 12px;
+    }
+    @keyframes marquee {
+      to { transform: translateX(-50%); }
+    }
+
+    /* ============ Section scaffolding ============ */
+    section.block {
+      position: relative;
+      z-index: 5;
+      max-width: var(--maxw);
+      margin: 0 auto;
+      padding: 160px var(--gutter) 120px;
+    }
+    .sec-head {
+      display: grid;
+      grid-template-columns: 200px 1fr;
+      gap: 40px;
+      margin-bottom: 56px;
+      align-items: start;
+    }
+    @media (max-width: 800px) {
+      .sec-head { grid-template-columns: 1fr; gap: 16px; }
+    }
+    .sec-num {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--ink-3);
+      text-transform: uppercase;
+      letter-spacing: 0.22em;
+      padding-top: 12px;
+      border-top: 1px solid var(--line);
+    }
+    .sec-title {
+      font-family: var(--serif);
+      font-weight: 300;
+      font-size: clamp(34px, 4vw, 56px);
+      line-height: 1.04;
+      letter-spacing: -0.025em;
+      margin: 0;
+      color: var(--ink);
+    }
+    .sec-title em { color: var(--accent); font-weight: 300; }
+    .sec-kicker {
+      font-family: var(--serif);
+      font-size: 17px;
+      line-height: 1.5;
+      color: var(--ink-2);
+      max-width: 56ch;
+      margin: 18px 0 0;
+    }
+
+    /* === HOW IT WORKS === */
+    .pipeline {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1px;
+      background: var(--line);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    @media (max-width: 900px) {
+      .pipeline { grid-template-columns: 1fr 1fr; }
+    }
+    .step {
+      background: var(--bg);
+      padding: 28px 24px 32px;
+      position: relative;
+      min-height: 280px;
+      display: flex;
+      flex-direction: column;
+    }
+    .step-num {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--accent);
+      letter-spacing: 0.18em;
+    }
+    .step-glyph {
+      margin: 22px 0 28px;
+      height: 80px;
+      display: flex;
+      align-items: center;
+    }
+    .step-glyph svg { height: 100%; width: auto; overflow: visible; }
+    .step-title {
+      font-family: var(--serif);
+      font-weight: 400;
+      font-size: 22px;
+      letter-spacing: -0.015em;
+      line-height: 1.2;
+      color: var(--ink);
+    }
+    .step-body {
+      font-family: var(--serif);
+      font-weight: 300;
+      font-size: 14.5px;
+      line-height: 1.5;
+      color: var(--ink-2);
+      margin-top: 10px;
+      flex: 1;
+    }
+    .step-meta {
+      margin-top: 16px;
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--ink-4);
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      padding-top: 12px;
+      border-top: 1px dashed var(--line);
+    }
+
+    /* === CARBON MATH === */
+    .carbon-grid {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 32px;
+      align-items: stretch;
+    }
+    @media (max-width: 1000px) { .carbon-grid { grid-template-columns: 1fr; } }
+    .equation {
+      padding: 36px;
+      background: linear-gradient(180deg, rgba(13,17,16,0.8), rgba(7,9,8,0.8));
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      position: relative;
+    }
+    .equation .label {
+      font-size: 10px;
+      color: var(--ink-3);
+      text-transform: uppercase;
+      letter-spacing: 0.2em;
+      margin-bottom: 24px;
+    }
+    .formula {
+      font-family: var(--serif);
+      font-weight: 300;
+      font-size: clamp(20px, 2.4vw, 30px);
+      line-height: 1.45;
+      letter-spacing: -0.015em;
+      color: var(--ink-2);
+    }
+    .formula .var {
+      color: var(--accent);
+      font-style: italic;
+      border-bottom: 1px dashed var(--accent-dim);
+      padding-bottom: 1px;
+    }
+    .formula .op {
+      color: var(--ink-3);
+      font-family: var(--mono);
+      font-style: normal;
+      font-size: 0.7em;
+      margin: 0 0.3em;
+      vertical-align: 0.05em;
+    }
+    .formula-key {
+      margin-top: 28px;
+      padding-top: 24px;
+      border-top: 1px solid var(--line);
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 14px 24px;
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--ink-3);
+    }
+    .formula-key .var {
+      color: var(--accent);
+      font-style: italic;
+      font-family: var(--serif);
+      margin-right: 10px;
+    }
+
+    .equivalents {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .equiv {
+      padding: 22px 26px;
+      background: rgba(13,17,16,0.6);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      display: grid;
+      grid-template-columns: 56px 1fr auto;
+      gap: 20px;
+      align-items: center;
+    }
+    .equiv-icon {
+      width: 56px; height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--accent);
+    }
+    .equiv-icon svg { width: 100%; height: 100%; overflow: visible; }
+    .equiv-num {
+      font-family: var(--serif);
+      font-weight: 300;
+      font-size: 32px;
+      letter-spacing: -0.02em;
+      color: var(--ink);
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+    }
+    .equiv-num .u {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--ink-3);
+      margin-left: 6px;
+      letter-spacing: 0.04em;
+    }
+    .equiv-label {
+      font-size: 11px;
+      color: var(--ink-3);
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      margin-top: 4px;
+    }
+    .equiv-spark {
+      width: 80px; height: 32px;
+    }
+
+    /* === Validation panel === */
+    .validation-grid { display: grid; grid-template-columns: 1.6fr 1fr; gap: 24px; }
+    @media (max-width: 1000px) { .validation-grid { grid-template-columns: 1fr; } }
+    .vpanel { background: linear-gradient(180deg,rgba(13,17,16,0.8),rgba(7,9,8,0.8)); border:1px solid var(--line); border-radius:10px; padding:22px; }
+    .vpanel-head { display:flex; justify-content:space-between; font-size:10px; color:var(--ink-3); text-transform:uppercase; letter-spacing:0.18em; margin-bottom:14px; }
+    .vpanel-head .vstamp { color:var(--accent); font-family:var(--mono); }
+    .vchart { width:100%; height:240px; display:block; }
+    .vpanel-foot { display:flex; gap:18px; align-items:center; font-family:var(--mono); font-size:10px; color:var(--ink-2); margin-top:14px; padding-top:14px; border-top:1px solid var(--line); flex-wrap:wrap; }
+    .vdot { display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--accent); margin-right:6px; vertical-align:middle; box-shadow:0 0 6px var(--accent); }
+    .vside { display:flex; flex-direction:column; gap:14px; }
+    .vstat { background:rgba(13,17,16,0.6); border:1px solid var(--line); border-radius:8px; padding:18px 20px; }
+    .vstat-k { font-size:10px; color:var(--ink-3); text-transform:uppercase; letter-spacing:0.16em; }
+    .vstat-v { font-family:var(--serif); font-weight:300; font-size:36px; letter-spacing:-0.025em; color:var(--ink); margin-top:6px; line-height:1; font-variant-numeric:tabular-nums; }
+    .vstat-v .u { font-family:var(--mono); font-size:11px; color:var(--ink-3); margin-left:8px; letter-spacing:0.04em; }
+    .vbar { height:3px; background:var(--bg-3); border-radius:2px; overflow:hidden; margin-top:12px; }
+    .vbar i { display:block; height:100%; background:linear-gradient(90deg,var(--accent-dim),var(--accent)); transform:scaleX(var(--w,0.5)); transform-origin:left; transition:transform 1s; }
+
+    /* === Catalog === */
+    .catalog { display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:var(--line); border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+    @media (max-width:900px) { .catalog { grid-template-columns:1fr 1fr; } }
+    .layer { background:var(--bg); padding:24px 22px 26px; display:flex; flex-direction:column; gap:10px; min-height:240px; }
+    .layer-tag { font-family:var(--mono); font-size:10px; color:var(--accent); text-transform:uppercase; letter-spacing:0.2em; }
+    .layer-title { font-family:var(--serif); font-size:20px; font-weight:400; letter-spacing:-0.015em; color:var(--ink); line-height:1.2; }
+    .layer-body { font-family:var(--serif); font-weight:300; font-size:14px; line-height:1.5; color:var(--ink-2); flex:1; }
+    .layer-conf { display:flex; align-items:center; gap:10px; font-family:var(--mono); font-size:10px; color:var(--ink-3); text-transform:uppercase; letter-spacing:0.14em; padding-top:12px; border-top:1px dashed var(--line); }
+    .layer-conf i { flex:1; height:3px; background:var(--bg-3); border-radius:2px; position:relative; }
+    .layer-conf i::after { content:''; position:absolute; left:0; top:0; bottom:0; width:calc(var(--w)*100%); background:linear-gradient(90deg,var(--accent-dim),var(--accent)); border-radius:2px; }
+    .layer-conf b { color:var(--accent); font-weight:500; font-family:var(--mono); }
+
+    /* === MODELS strip === */
+    .models {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 1px;
+      background: var(--line);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    @media (max-width: 900px) {
+      .models { grid-template-columns: repeat(3, 1fr); }
+    }
+    .model {
+      background: var(--bg);
+      padding: 20px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      transition: background .2s;
+    }
+    .model:hover { background: var(--bg-2); }
+    .model-name {
+      font-family: var(--serif);
+      font-size: 16px;
+      font-weight: 400;
+      letter-spacing: -0.01em;
+      color: var(--ink);
+    }
+    .model-meta {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--ink-3);
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+    }
+    .model-bar {
+      height: 3px;
+      background: var(--bg-3);
+      border-radius: 2px;
+      overflow: hidden;
+      margin-top: auto;
+    }
+    .model-bar i {
+      display: block;
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent-dim), var(--accent));
+      animation: barfill 2s cubic-bezier(.4,0,.2,1) forwards;
+      transform-origin: left;
+    }
+    @keyframes barfill {
+      from { transform: scaleX(0); }
+      to { transform: scaleX(var(--w, 0.6)); }
+    }
+    .model-savings {
+      font-family: var(--serif);
+      font-weight: 300;
+      font-size: 22px;
+      color: var(--accent);
+      letter-spacing: -0.02em;
+    }
+
+    /* === CTA === */
+    .cta-block {
+      position: relative;
+      z-index: 5;
+      max-width: var(--maxw);
+      margin: 80px auto 0;
+      padding: 80px var(--gutter);
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      text-align: center;
+    }
+    .cta-block::before, .cta-block::after {
+      content: "";
+      position: absolute;
+      left: 0; right: 0;
+      height: 80px;
+      pointer-events: none;
+    }
+    .cta-block::before {
+      top: 0;
+      background: radial-gradient(60% 100% at 50% 0%, rgba(124,255,178,0.12), transparent 60%);
+    }
+    .cta-headline {
+      font-family: var(--serif);
+      font-weight: 300;
+      font-size: clamp(40px, 5.2vw, 76px);
+      line-height: 1.02;
+      letter-spacing: -0.03em;
+      margin: 0;
+      color: var(--ink);
+    }
+    .cta-headline em { color: var(--accent); font-weight: 300; }
+    .cta-sub {
+      font-family: var(--serif);
+      font-size: 18px;
+      color: var(--ink-2);
+      max-width: 60ch;
+      margin: 22px auto 36px;
+      line-height: 1.5;
+    }
+    .cta-form {
+      display: inline-flex;
+      align-items: center;
+      gap: 0;
+      background: rgba(13,17,16,0.8);
+      border: 1px solid var(--line-2);
+      border-radius: 8px;
+      padding: 6px;
+      max-width: 540px;
+      width: 100%;
+    }
+    .cta-form input {
+      flex: 1;
+      background: transparent;
+      border: 0;
+      outline: 0;
+      padding: 12px 14px;
+      color: var(--ink);
+      font-family: var(--mono);
+      font-size: 13px;
+    }
+    .cta-form input::placeholder { color: var(--ink-4); }
+    .cta-form button {
+      padding: 12px 22px;
+      border-radius: 6px;
+      background: var(--accent);
+      color: #062014;
+      font-weight: 500;
+      font-size: 12px;
+      letter-spacing: 0.04em;
+      transition: all .2s;
+      font-family: var(--mono);
+    }
+    .cta-form button:hover {
+      box-shadow: 0 0 0 4px rgba(124,255,178,0.18);
+    }
+    .cta-meta {
+      margin-top: 22px;
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--ink-3);
+      letter-spacing: 0.04em;
+    }
+    .cta-meta .sep { color: var(--ink-4); margin: 0 12px; }
+
+    /* === Footer === */
+    footer.foot {
+      position: relative;
+      z-index: 5;
+      max-width: var(--maxw);
+      margin: 0 auto;
+      padding: 60px var(--gutter) 40px;
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr 1fr;
+      gap: 32px;
+      font-size: 12px;
+      color: var(--ink-3);
+      border-top: 1px solid var(--line);
+    }
+    @media (max-width: 800px) { footer.foot { grid-template-columns: 1fr 1fr; } }
+    footer h5 {
+      font-family: var(--mono);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.2em;
+      color: var(--ink-2);
+      margin: 0 0 14px;
+      font-weight: 400;
+    }
+    footer ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; }
+    footer ul a:hover { color: var(--accent); }
+    .foot-brand {
+      font-family: var(--serif);
+      font-size: 28px;
+      letter-spacing: -0.02em;
+      color: var(--ink);
+      font-weight: 300;
+    }
+    .foot-tag {
+      margin-top: 14px;
+      font-family: var(--serif);
+      font-size: 14px;
+      color: var(--ink-2);
+      max-width: 36ch;
+      line-height: 1.4;
+    }
+    .foot-status {
+      margin-top: 22px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--ink-2);
+    }
+    .foot-status .dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 6px var(--accent);
+      animation: pulse 1.6s infinite;
+    }
+    .foot-bottom {
+      max-width: var(--maxw);
+      margin: 0 auto;
+      padding: 0 var(--gutter) 40px;
+      display: flex;
+      justify-content: space-between;
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--ink-4);
+      letter-spacing: 0.08em;
+    }
+
+    /* hidden tagger */
+    .ascii-coord {
+      position: fixed;
+      bottom: 16px; left: 16px;
+      z-index: 50;
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--ink-4);
+      letter-spacing: 0.1em;
+      pointer-events: none;
+    }
+    .scroll-indicator {
+      position: absolute;
+      left: 50%;
+      bottom: -40px;
+      transform: translateX(-50%);
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--ink-3);
+      text-transform: uppercase;
+      letter-spacing: 0.2em;
+      writing-mode: vertical-rl;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+  </style>
+</head>
+<body>
+  <!-- ===================== ATMOSPHERIC ENTRY LAYER ===================== -->
+  <div id="arbiter-entry-spacer" style="height: 350vh; width: 100vw; position: relative; pointer-events: none; z-index: 0;"></div>
+  
+  <div id="arbiter-entry-layer" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 9999; pointer-events: none; background: #070908; overflow: hidden; display: flex; align-items: center; justify-content: center; transition: opacity 0.3s ease;">
+    
+    <canvas id="thermalCanvas" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1;"></canvas>
+    
+    <div id="arbiter-center-text" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 10; font-family: var(--serif, 'Fraunces', serif); font-size: 22px; font-weight: 300; letter-spacing: 0.12em; color: #fff; text-transform: uppercase; transition: opacity 0.2s, transform 0.2s; opacity: 0.6; text-shadow: 0 4px 12px rgba(0,0,0,0.5);">
+      Arbiter
+    </div>
+
+    <!-- HUD LOGS -->
+    <div id="arbiter-hud" style="position: absolute; bottom: 40px; left: 40px; font-family: var(--mono, monospace); font-size: 11px; color: var(--accent, #7CFFB2); z-index: 10; opacity: 0; transition: opacity 0.5s;">
+      <div style="color: var(--ink-3, rgba(255,255,255,0.4)); text-transform: uppercase; letter-spacing: 0.2em; font-size: 10px; margin-bottom: 12px;">[ System Logs ]</div>
+      <div id="hud-log-1" style="margin-bottom: 6px;"></div>
+      <div id="hud-log-2" style="margin-bottom: 6px;"></div>
+      <div id="hud-log-3" style="margin-bottom: 6px;"></div>
+    </div>
+    
+    <!-- HUD STATS -->
+    <div id="arbiter-hud-stats" style="position: absolute; top: 40px; right: 40px; font-family: var(--mono, monospace); font-size: 10px; color: rgba(255,255,255,0.6); text-align: right; z-index: 10; opacity: 0; transition: opacity 0.5s; text-transform: uppercase; letter-spacing: 0.1em;">
+      <div>Active Nodes: <span id="stat-nodes" style="color:#FF3C3C; font-weight:bold; margin-left: 6px;">8,402</span></div>
+      <div style="margin-top: 8px;">Wasted Cycles: <span id="stat-waste" style="color:#FF3C3C; font-weight:bold; margin-left: 6px;">72.4%</span></div>
+      <div style="margin-top: 8px;">Status: <span id="stat-status" style="color:#FF3C3C; font-weight: bold; margin-left: 6px;">CRITICAL THERMALS</span></div>
+    </div>
+
+  </div>
+
+  <script>
+    (function() {
+      const thermalCanvas = document.getElementById('thermalCanvas');
+      const entryLayer = document.getElementById('arbiter-entry-layer');
+      const centerText = document.getElementById('arbiter-center-text');
+      
+      const hud = document.getElementById('arbiter-hud');
+      const hudStats = document.getElementById('arbiter-hud-stats');
+      const log1 = document.getElementById('hud-log-1');
+      const log2 = document.getElementById('hud-log-2');
+      const log3 = document.getElementById('hud-log-3');
+      const sNodes = document.getElementById('stat-nodes');
+      const sWaste = document.getElementById('stat-waste');
+      const sStatus = document.getElementById('stat-status');
+
+      const ctx = thermalCanvas.getContext('2d', { alpha: false });
+      
+      let width, height;
+      let scrollProgress = 0;
+      
+      let cells = [];
+      let cols, rows;
+      const CELL_SIZE = 44;
+      const GAP = 6;
+      
+      const MINT = [124, 255, 178];
+      const HOT_RED = [255, 60, 60];
+      const WHITE = [255, 255, 255];
+      const DARK_BG = [10, 12, 11];
+      
+      function initCells() {
+          cols = Math.ceil(width / CELL_SIZE);
+          rows = Math.ceil(height / CELL_SIZE);
+          cells = [];
+          
+          let cx = cols / 2;
+          let cy = rows / 2;
+          
+          for(let y=0; y<rows; y++) {
+              for(let x=0; x<cols; x++) {
+                  // Make space for the central Arbiter text
+                  let dist = Math.hypot(x - cx, y - cy);
+                  if (dist < 3.5) continue; 
+                  
+                  cells.push({
+                      x: x, y: y,
+                      baseHeat: Math.random(),
+                      pulse: Math.random() * Math.PI * 2,
+                      speed: 1.5 + Math.random() * 5.0,
+                      isOptimizedNode: Math.random() > 0.85
+                  });
+              }
+          }
+      }
+      
+      function resize() {
+        width = window.innerWidth;
+        height = window.innerHeight;
+        thermalCanvas.width = width;
+        thermalCanvas.height = height;
+        initCells();
+      }
+      
+      function render(time) {
+          ctx.fillStyle = "#070908";
+          ctx.fillRect(0, 0, width, height);
+          
+          let size = CELL_SIZE - GAP;
+          let halfGap = GAP / 2;
+          
+          let cx = cols / 2;
+          let cy = rows / 2;
+          let maxDist = Math.hypot(cx, cy);
+          
+          for(let i=0; i<cells.length; i++) {
+              let c = cells[i];
+              let px = c.x * CELL_SIZE + halfGap;
+              let py = c.y * CELL_SIZE + halfGap;
+              
+              // 1. Thermal Chaos State
+              let heatSine = (Math.sin(c.pulse + time * 0.002 * c.speed) + 1) / 2; 
+              let currentHeat = c.baseHeat * 0.6 + heatSine * 0.4; 
+              
+              // 2. Cooling Wave Calculation
+              let distToCenter = Math.hypot(c.x - cx, c.y - cy);
+              let normalizedDist = distToCenter / maxDist;
+              
+              let coolingFactor = 0; 
+              let waveThreshold = scrollProgress * 1.5; 
+              
+              if (normalizedDist < waveThreshold - 0.2) {
+                  coolingFactor = 1;
+              } else if (normalizedDist < waveThreshold) {
+                  coolingFactor = (waveThreshold - normalizedDist) / 0.2;
+              }
+              
+              // 3. Color Blending
+              let r = 0, g = 0, b = 0, a = 0;
+              
+              if (coolingFactor < 1) {
+                  let hcR, hcG, hcB;
+                  if (currentHeat > 0.8) {
+                      let f = (currentHeat - 0.8) / 0.2;
+                      hcR = HOT_RED[0] + (WHITE[0] - HOT_RED[0]) * f;
+                      hcG = HOT_RED[1] + (WHITE[1] - HOT_RED[1]) * f;
+                      hcB = HOT_RED[2] + (WHITE[2] - HOT_RED[2]) * f;
+                  } else {
+                      let f = currentHeat / 0.8;
+                      hcR = DARK_BG[0] + (HOT_RED[0] - DARK_BG[0]) * f;
+                      hcG = DARK_BG[1] + (HOT_RED[1] - DARK_BG[1]) * f;
+                      hcB = DARK_BG[2] + (HOT_RED[2] - DARK_BG[2]) * f;
+                  }
+                  r = hcR; g = hcG; b = hcB; a = 0.5 + currentHeat * 0.5;
+              }
+              
+              if (coolingFactor > 0) {
+                  let optR = MINT[0], optG = MINT[1], optB = MINT[2], optA;
+                  if (c.isOptimizedNode) {
+                      optA = 0.5 + Math.sin(c.pulse + time * 0.001) * 0.4; 
+                  } else {
+                      optA = 0.03;
+                  }
+                  
+                  r = r * (1 - coolingFactor) + optR * coolingFactor;
+                  g = g * (1 - coolingFactor) + optG * coolingFactor;
+                  b = b * (1 - coolingFactor) + optB * coolingFactor;
+                  a = (a || 1) * (1 - coolingFactor) + optA * coolingFactor;
+              }
+              
+              let sr = Math.round(r), sg = Math.round(g), sb = Math.round(b);
+
+              // 4. Draw GPU Package
+              // Substrate base
+              ctx.fillStyle = "rgba(" + Math.round(sr*0.15) + ", " + Math.round(sg*0.15) + ", " + Math.round(sb*0.15) + ", " + a + ")";
+              ctx.fillRect(px, py, size, size);
+              
+              // Substrate outline (circuit traces)
+              ctx.strokeStyle = "rgba(" + Math.round(sr*0.5) + ", " + Math.round(sg*0.5) + ", " + Math.round(sb*0.5) + ", " + a + ")";
+              ctx.lineWidth = 1;
+              ctx.strokeRect(px + 2, py + 2, size - 4, size - 4);
+              
+              // Silicon Die (Hot center)
+              ctx.fillStyle = "rgba(" + sr + ", " + sg + ", " + sb + ", " + a + ")";
+              ctx.fillRect(px + size*0.3, py + size*0.3, size*0.4, size*0.4);
+              
+              // White hot core / Activity dot
+              if (coolingFactor < 1 && currentHeat > 0.8) {
+                  let f = 1 - coolingFactor;
+                  ctx.fillStyle = "rgba(255, 255, 255, " + (0.8 * f) + ")";
+                  ctx.fillRect(px + size*0.4, py + size*0.4, size*0.2, size*0.2);
+              } else if (coolingFactor > 0 && c.isOptimizedNode) {
+                  ctx.fillStyle = "rgba(255, 255, 255, " + (0.6 * coolingFactor) + ")";
+                  ctx.fillRect(px + size*0.45, py + size*0.45, size*0.1, size*0.1);
+              }
+              
+              // Pin 1 indicator
+              ctx.fillStyle = "rgba(" + sr + ", " + sg + ", " + sb + ", " + (a*0.8) + ")";
+              ctx.fillRect(px + 5, py + 5, 2, 2);
+          }
+      }
+
+      function animate(time) {
+          if (scrollProgress < 1.0) {
+              render(time);
+          }
+          requestAnimationFrame(animate);
+      }
+      
+      window.addEventListener('resize', resize);
+      resize();
+      requestAnimationFrame(animate);
+
+      // --- SCROLL LOGIC ---
+      window.addEventListener('scroll', () => {
+        const scrollY = window.scrollY;
+        const vh = window.innerHeight;
+        
+        // Extended scroll duration
+        scrollProgress = Math.min(Math.max(scrollY / (vh * 3.5), 0), 1);
+        
+        // Center text scale
+        if (scrollProgress < 0.3) {
+          centerText.style.opacity = '0.6';
+          centerText.style.transform = "translate(-50%, -50%) scale(1)";
+        } else if (scrollProgress < 0.7) {
+          const p = (scrollProgress - 0.3) / 0.4;
+          centerText.style.opacity = (0.6 + p * 0.4).toString();
+          centerText.style.transform = "translate(-50%, -50%) scale(" + (1 + p * 0.1) + ")";
+        } else {
+          const p = (scrollProgress - 0.7) / 0.3;
+          centerText.style.opacity = (1 - p).toString();
+          centerText.style.transform = "translate(-50%, -50%) scale(1.1)";
+        }
+        
+        // HUD and STATS Logic
+        if (scrollProgress > 0.02 && scrollProgress < 0.95) {
+            hud.style.opacity = 1;
+            hudStats.style.opacity = 1;
+        } else {
+            hud.style.opacity = 0;
+            hudStats.style.opacity = 0;
+        }
+
+        if (scrollProgress < 0.2) {
+            log1.innerText = "> Analyzing global infrastructure...";
+            log2.innerText = "";
+            log3.innerText = "";
+            sNodes.innerText = "8,402"; sNodes.style.color = "#FF3C3C";
+            sWaste.innerText = "72.4%"; sWaste.style.color = "#FF3C3C";
+            sStatus.innerText = "CRITICAL THERMALS"; sStatus.style.color = "#FF3C3C";
+        } else if (scrollProgress < 0.5) {
+            log1.innerText = "> Analyzing global infrastructure... [DONE]";
+            log2.innerText = "> Identifying carbon-heavy & idle clusters...";
+            log3.innerText = "";
+            sNodes.innerText = Math.floor(8402 - (scrollProgress - 0.2) * 20000).toLocaleString();
+            sWaste.innerText = (72.4 - (scrollProgress - 0.2) * 150).toFixed(1) + "%";
+            sStatus.innerText = "REROUTING..."; sStatus.style.color = "#FFAA33";
+        } else if (scrollProgress < 0.8) {
+            log1.innerText = "> Analyzing global infrastructure... [DONE]";
+            log2.innerText = "> Identifying carbon-heavy & idle clusters... [DONE]";
+            log3.innerText = "> Offloading workloads to efficient regions...";
+            
+            let currentNodes = Math.max(1260, Math.floor(2402 - (scrollProgress - 0.5) * 4000));
+            sNodes.innerText = currentNodes.toLocaleString(); sNodes.style.color = "#7CFFB2";
+            
+            let currentWaste = Math.max(1.2, 27.4 - (scrollProgress - 0.5) * 80);
+            sWaste.innerText = currentWaste.toFixed(1) + "%"; sWaste.style.color = "#7CFFB2";
+            
+            sStatus.innerText = "OPTIMIZING..."; sStatus.style.color = "#7CFFB2";
+        } else {
+            log1.innerText = "> Analyzing global infrastructure... [DONE]";
+            log2.innerText = "> Identifying carbon-heavy & idle clusters... [DONE]";
+            log3.innerText = "> Offloading workloads to efficient regions... [DONE]";
+            sNodes.innerText = "1,260"; sNodes.style.color = "#7CFFB2";
+            sWaste.innerText = "1.2%"; sWaste.style.color = "#7CFFB2";
+            sStatus.innerText = "OPTIMIZED"; sStatus.style.color = "#7CFFB2";
+        }
+        
+        // Late fade out
+        let fadeOutProgress = 0;
+        if (scrollProgress > 0.9) {
+          fadeOutProgress = Math.min((scrollProgress - 0.9) / 0.1, 1);
+        }
+        
+        entryLayer.style.opacity = 1 - fadeOutProgress;
+        
+        if (fadeOutProgress >= 1) {
+          entryLayer.style.pointerEvents = "none";
+          entryLayer.style.display = "none";
+        } else {
+          entryLayer.style.display = "flex";
+        }
+      });
+      
+    })();
+  </script>
+  <!-- ===================== END ATMOSPHERIC ENTRY LAYER ===================== -->
+
+  <div class="bg-grid" id="bgGrid"></div>
+  <div class="bg-glow"></div>
+  <div class="bg-noise"></div>
+
+  <!-- ===================== TOP BAR ===================== -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 32 32" fill="none">
+          <g class="ring">
+            <circle cx="16" cy="16" r="13" stroke="#7CFFB2" stroke-width="0.8" stroke-dasharray="2 3"/>
+            <circle cx="16" cy="3" r="1.4" fill="#7CFFB2"/>
+          </g>
+          <circle cx="16" cy="16" r="7" stroke="#7CFFB2" stroke-width="1"/>
+          <path d="M11 16 L15 19 L21 12" stroke="#7CFFB2" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        </svg>
+      </div>
+      <span>Arbiter</span>
+    </div>
+
+    <nav class="nav-links">
+    </nav>
+
+    <div class="nav-cta">
+      <button class="btn btn-ghost">Sign in <span class="btn-arrow">→</span></button>
+      <button class="btn btn-primary">Run Shadow Mode</button>    </div>
+  </header>
+
+  <!-- ===================== HERO ===================== -->
+  <main class="hero" style="font-size: 1px">
+
+    <div class="hero-text">
+      <div class="hero-eyebrow">
+        <span class="dot"></span>
+        Shadow mode · 14,892 GPU-jobs analysed today
+      </div>
+
+      <h1 class="hero-title">The decision engine for your infrastructure. </h1>
+
+      <p class="hero-sub">Reduce GPU inference and training costs automatically across models, regions, and providers. Arbiter is FinOps-first for GPU workloads, with carbon as a built-in second axis.</p>
+
+      <div class="hero-lists">
+        <div class="hero-list">
+          <div class="hero-list-k">[ optimises ]</div>
+          <ul>
+            <li><span class="hl-dot"></span><span class="hl-key">hardware</span></li>
+            <li><span class="hl-dot"></span><span class="hl-key">region</span></li>
+            <li><span class="hl-dot"></span><span class="hl-key">timing</span></li>
+            <li><span class="hl-dot"></span><span class="hl-key">precision</span></li>
+          </ul>
+        </div>
+        <div class="hero-list">
+          <div class="hero-list-k">[ balances ]</div>
+          <ul>
+            <li><span class="hl-dot"></span><span class="hl-key">cost</span></li>
+            <li><span class="hl-dot"></span><span class="hl-key">carbon</span></li>
+            <li><span class="hl-dot"></span><span class="hl-key">latency</span></li>
+            <li><span class="hl-dot"></span><span class="hl-key">SLA</span></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="hero-stats">
+        <div class="stat">
+          <div class="stat-label">GPU cost reduction</div>
+          <div class="stat-value">≥30<span class="unit">% vs. naive default</span></div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">CO₂e per workload</div>
+          <div class="stat-value">≥20<span class="unit">% lower</span></div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Predicted vs. actual</div>
+          <div class="stat-value">&lt;15<span class="unit">% variance</span></div>
+        </div>
+      </div>
+
+      <div class="hero-cta">
+        <button class="btn">Read methodology →</button>
+      </div>
+      <div class="hero-cta-note" style="margin-top:14px">
+        Python SDK · CLI · GitHub Action · Kubeflow / Airflow operators. <span class="key">⌘</span><span class="key">K</span> for the playground.
+      </div>
+    </div>
+
+    <!-- ============ Animated Centerpiece ============ -->
+    <aside class="centerpiece">
+      <div class="panel panel-corners telemetry" id="telemetry">
+        <div class="panel-bar">
+          <div class="bullets"><span></span><span></span><span></span></div>
+          <span>arbiter&nbsp;·&nbsp;telemetry&nbsp;·&nbsp;eu-west-2</span>
+          <span class="live"><span class="dot"></span> LIVE</span>
+        </div>
+
+        <div class="telemetry-body">
+
+          <!-- Counter -->
+          <div class="counter-row">
+            <div>
+              <div class="counter-label">Shadow savings · 30d rolling</div>
+              <div class="counter" id="savingsCounter"><span class="currency">$</span><span id="savingsValue">428,194</span></div>
+            </div>
+            <div class="counter-side">
+              vs. naive-default baseline<br>
+              <span class="delta"><span class="arrow">▼</span> 38.4% GPU spend</span><br>
+              <span style="opacity:0.6">variance ± 9.2%</span>
+            </div>
+          </div>
+
+          <!-- Chart -->
+          <div>
+            <div class="chart-legend">
+              <span><span class="swatch dashed"></span> baseline</span>
+              <span><span class="swatch solid"></span> optimised</span>
+              <span style="margin-left:auto;color:var(--ink-3)">cost · USD/1k req</span>
+            </div>
+            <div class="chart-wrap" style="margin-top:8px">
+              <div class="chart-y">
+                <span style="top:0">$2.40</span>
+                <span style="top:33%">$1.80</span>
+                <span style="top:66%">$1.20</span>
+                <span style="bottom:14px">$0.60</span>
+              </div>
+              <svg viewBox="0 0 600 180" preserveAspectRatio="none" id="chartSvg" style="padding-left:0">
+                <defs>
+                  <linearGradient id="areaGrad" x1="0" x2="0" y1="0" y2="1">
+                    <stop offset="0" stop-color="#7CFFB2" stop-opacity="0.35"/>
+                    <stop offset="1" stop-color="#7CFFB2" stop-opacity="0"/>
+                  </linearGradient>
+                  <pattern id="gp" width="40" height="30" patternUnits="userSpaceOnUse">
+                    <path d="M40 0L0 0 0 30" stroke="#1f2622" stroke-width="0.5" fill="none"/>
+                  </pattern>
+                </defs>
+                <rect x="48" y="0" width="552" height="160" fill="url(#gp)"/>
+                <!-- baseline (dashed) -->
+                <path id="basePath" d="" fill="none" stroke="#6b736d" stroke-width="1" stroke-dasharray="3 3"/>
+                <!-- optimised area -->
+                <path id="optArea" d="" fill="url(#areaGrad)" stroke="none"/>
+                <!-- optimised line -->
+                <path id="optPath" d="" fill="none" stroke="#7CFFB2" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>
+                <!-- live dot -->
+                <circle id="liveDot" r="4" cx="600" cy="80" fill="#7CFFB2"/>
+                <circle id="liveDotPulse" r="9" cx="600" cy="80" fill="none" stroke="#7CFFB2" stroke-width="1" opacity="0.6"/>
+              </svg>
+              <div class="chart-x">
+                <span>−60s</span><span>−45s</span><span>−30s</span><span>−15s</span><span>now</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sub stats -->
+          <div class="substats">
+            <div class="substat">
+              <div class="substat-k">CO₂e avoided</div>
+              <div class="substat-v" id="co2Val">11,842<span class="u">kg / 30d</span></div>
+              <div class="substat-trend">▼ 24.1% vs. baseline</div>
+            </div>
+            <div class="substat">
+              <div class="substat-k">Mode</div>
+              <div class="substat-v" id="kwhVal">Shadow<span class="u">→ advisory</span></div>
+              <div class="substat-trend">12 days to promotion</div>
+            </div>
+            <div class="substat">
+              <div class="substat-k">GPU jobs analysed</div>
+              <div class="substat-v" id="tokVal">12.7K<span class="u">/ 30d</span></div>
+              <div class="substat-trend">5 classes · 7 regions</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stream -->
+      <div class="stream">
+        <div class="stream-head">
+          <span>routing.log</span>
+          <span style="color:var(--accent)">tail -f</span>
+        </div>
+        <ul class="stream-list" id="streamList"></ul>
+      </div>
+    </aside>
+
+  </main>
+
+  <!-- ===================== Orchestrator ===================== -->
+  <section class="orchestrator" id="orchestrator" aria-label="Realtime workload rerouting">
+    <div class="orch-head">
+      <div class="orch-meta">
+        <span class="orch-num">§ orchestrator</span>
+        <span class="orch-sep">·</span>
+        <span class="orch-pulse"><span class="pdot"></span> realtime · evaluating</span>
+        <span class="orch-sep">·</span>
+        <span class="orch-clock" id="orchClock">— — : — — : — —</span>
+      </div>
+      <h2 class="orch-title">Workloads <em>continuously rerouted</em> across providers, regions, and hardware.</h2>
+    </div>
+
+    <div class="orch-stage">
+      <!-- Column 1 — incoming workload -->
+      <div class="orch-col">
+        <div class="col-label">incoming workload</div>
+        <div class="job-card" id="jobCard">
+          <div class="job-line">
+            <span class="job-tag">job</span>
+            <span class="job-id" id="jobId">inference-job-421</span>
+          </div>
+          <div class="job-row"><span class="k">model</span><span class="v">llama-3.1-70b-instruct</span></div>
+          <div class="job-row"><span class="k">class</span><span class="v">latency-critical inference</span></div>
+          <div class="job-row"><span class="k">tokens</span><span class="v" id="jobTokens">2.41M</span></div>
+          <div class="job-row"><span class="k">residency</span><span class="v">eu · soft</span></div>
+          <div class="job-divider"></div>
+          <div class="job-status" id="jobStatus">
+            <span class="sdot"></span><span>received · awaiting decision</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Column 2 — sequential evaluation -->
+      <div class="orch-col orch-col-eval">
+        <div class="col-label">evaluation</div>
+        <ul class="dim-list" id="dimList">
+          <li data-dim="provider"><span class="dim-idx">01</span><span class="dim-k">provider</span><span class="dim-v">—</span><span class="dim-state"></span></li>
+          <li data-dim="region"><span class="dim-idx">02</span><span class="dim-k">region</span><span class="dim-v">—</span><span class="dim-state"></span></li>
+          <li data-dim="latency"><span class="dim-idx">03</span><span class="dim-k">latency</span><span class="dim-v">—</span><span class="dim-state"></span></li>
+          <li data-dim="carbon"><span class="dim-idx">04</span><span class="dim-k">carbon</span><span class="dim-v">—</span><span class="dim-state"></span></li>
+          <li data-dim="precision"><span class="dim-idx">05</span><span class="dim-k">precision</span><span class="dim-v">—</span><span class="dim-state"></span></li>
+          <li data-dim="cost"><span class="dim-idx">06</span><span class="dim-k">cost</span><span class="dim-v">—</span><span class="dim-state"></span></li>
+        </ul>
+        <div class="dim-progress"><i id="dimProgress"></i></div>
+      </div>
+
+      <!-- Column 3 — route map -->
+      <div class="orch-col orch-col-routes">
+        <div class="col-label">candidate routes</div>
+        <div class="route-wrap">
+          <svg class="route-svg" id="routeSvg" viewBox="0 0 420 360" preserveAspectRatio="xMidYMid meet">
+            <defs>
+              <linearGradient id="lineGrad" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stop-color="#7CFFB2" stop-opacity="0"/>
+                <stop offset="40%" stop-color="#7CFFB2" stop-opacity="0.6"/>
+                <stop offset="100%" stop-color="#7CFFB2" stop-opacity="0.9"/>
+              </linearGradient>
+              <radialGradient id="haloGrad">
+                <stop offset="0%" stop-color="#7CFFB2" stop-opacity="0.55"/>
+                <stop offset="60%" stop-color="#7CFFB2" stop-opacity="0.06"/>
+                <stop offset="100%" stop-color="#7CFFB2" stop-opacity="0"/>
+              </radialGradient>
+            </defs>
+
+            <!-- Source -->
+            <g class="src-group">
+              <circle cx="40" cy="180" r="28" fill="url(#haloGrad)"/>
+              <circle cx="40" cy="180" r="6" fill="#7CFFB2"/>
+              <circle cx="40" cy="180" r="11" fill="none" stroke="#7CFFB2" stroke-width="1" opacity="0.4"/>
+              <text x="40" y="218" text-anchor="middle" class="src-label">ingress</text>
+            </g>
+
+            <!-- Connection lines (drawn first so they sit behind nodes) -->
+            <g id="routeLines">
+              <path class="route-line" data-r="0" d="M52 180 C 160 60, 250 60, 348 70"/>
+              <path class="route-line" data-r="1" d="M52 180 C 160 130, 250 130, 348 150"/>
+              <path class="route-line" data-r="2" d="M52 180 C 160 230, 250 230, 348 230"/>
+              <path class="route-line" data-r="3" d="M52 180 C 160 300, 250 300, 348 310"/>
+              <!-- flowing pulse on optimal route -->
+              <path class="route-flow" id="routeFlow" d="M52 180 C 160 130, 250 130, 348 150" fill="none"/>
+            </g>
+
+            <!-- Provider nodes -->
+            <g id="routeNodes">
+              <g class="node" data-r="0" transform="translate(348,70)">
+                <rect x="0" y="-22" width="68" height="44" rx="6"/>
+                <text class="n-name" x="34" y="-4">Lambda</text>
+                <text class="n-region" x="34" y="13">sfo · h100</text>
+                <circle class="n-dot" cx="-6" cy="0" r="3"/>
+              </g>
+              <g class="node" data-r="1" transform="translate(348,150)">
+                <rect x="0" y="-22" width="68" height="44" rx="6"/>
+                <text class="n-name" x="34" y="-4">CoreWeave</text>
+                <text class="n-region" x="34" y="13">fra · h100</text>
+                <circle class="n-dot" cx="-6" cy="0" r="3"/>
+              </g>
+              <g class="node" data-r="2" transform="translate(348,230)">
+                <rect x="0" y="-22" width="68" height="44" rx="6"/>
+                <text class="n-name" x="34" y="-4">AWS</text>
+                <text class="n-region" x="34" y="13">iad · a100</text>
+                <circle class="n-dot" cx="-6" cy="0" r="3"/>
+              </g>
+              <g class="node" data-r="3" transform="translate(348,310)">
+                <rect x="0" y="-22" width="68" height="44" rx="6"/>
+                <text class="n-name" x="34" y="-4">Azure</text>
+                <text class="n-region" x="34" y="13">dub · a100</text>
+                <circle class="n-dot" cx="-6" cy="0" r="3"/>
+              </g>
+            </g>
+          </svg>
+        </div>
+      </div>
+      </div>
+    </div>
+
+    <!-- Telemetry strip -->
+    <div class="orch-tele">
+      <div class="tele">
+        <div class="tele-k">decision</div>
+        <div class="tele-v" id="tDecision">— —</div>
+        <div class="tele-d" id="tDecisionMeta">awaiting</div>
+      </div>
+      <div class="tele">
+        <div class="tele-k">savings vs naive</div>
+        <div class="tele-v"><span class="cu">$</span><span id="tSavings">0</span></div>
+        <div class="tele-d"><span id="tSavingsPct">0.0%</span> · per-job</div>
+      </div>
+      <div class="tele">
+        <div class="tele-k">latency p99</div>
+        <div class="tele-v"><span id="tLatency">—</span><span class="cu">ms</span></div>
+        <div class="tele-bar"><i id="tLatencyBar"></i></div>
+      </div>
+      <div class="tele">
+        <div class="tele-k">carbon score</div>
+        <div class="tele-v"><span id="tCarbon">—</span><span class="cu">gCO₂e</span></div>
+        <div class="tele-bar"><i id="tCarbonBar"></i></div>
+      </div>
+      <div class="tele tele-utl">
+        <div class="tele-k">provider utilisation</div>
+        <div class="utl-rows">
+          <div class="utl"><span>lambda</span><i style="--w:0.18"></i><b>18</b></div>
+          <div class="utl"><span>coreweave</span><i style="--w:0.62"></i><b>62</b></div>
+          <div class="utl"><span>aws</span><i style="--w:0.41"></i><b>41</b></div>
+          <div class="utl"><span>azure</span><i style="--w:0.27"></i><b>27</b></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== Marquee ===================== -->
+  <div class="marquee" aria-hidden="true">
+    <div class="marquee-track" id="marquee">
+      <span>training</span><span>fine-tuning</span><span>latency-critical inference</span><span>background inference</span><span>eval / experiments</span><span>shadow mode</span><span>advisory</span><span>gated</span><span>autonomous</span><span>predicted vs. actual</span>
+      <span>training</span><span>fine-tuning</span><span>latency-critical inference</span><span>background inference</span><span>eval / experiments</span><span>shadow mode</span><span>advisory</span><span>gated</span><span>autonomous</span><span>predicted vs. actual</span>
+    </div>
+  </div>
+
+  <!-- ===================== CTA ===================== -->
+  <section class="cta-block" id="pricing">
+    <h2 class="cta-headline">Run shadow mode.<br>See the <em>number</em> before you commit.</h2>
+    <p class="cta-sub">Arbiter observes your real GPU workloads and generates the recommendations it would have made — with no configuration risk. Designed for serious systems and the operators who run them.</p>
+    <form class="cta-form" onsubmit="event.preventDefault(); this.querySelector('button').textContent='Sent ✓';">
+      <input type="email" placeholder="you@company.com" required>
+      <button type="submit">Run shadow mode →</button>
+    </form>
+    <div class="cta-meta">
+      <span>FinOps-first for GPU</span><span class="sep">/</span>
+      <span>CDP · TCFD · EU CSRD-aligned</span><span class="sep">/</span>
+      <span>shadow → autonomous</span><span class="sep">/</span>
+      <span>SOC 2 (in progress)</span>
+    </div>
+  </section>
+
+  <!-- ===================== FOOTER ===================== -->
+  <footer class="foot">
+    <div>
+      <div class="foot-brand">Arbiter<sup style="font-family:var(--mono);font-size:11px;color:var(--accent);vertical-align:super">⌁</sup></div>
+      <div class="foot-tag">The decision-intelligence control plane between your observability tools and your execution infrastructure. FinOps-first for GPU workloads, with carbon as a built-in second axis.</div>
+      <div class="foot-status"><span class="dot"></span> Carbon-data feed nominal · WattTime + Electricity Maps · <span style="color:var(--ink-3)">5-min cache TTL</span></div>
+    </div>
+    <div>
+      <h5>Product</h5>
+      <ul>
+        <li><a href="#pricing">Get started</a></li>
+        <li><a href="#">Sign in</a></li>
+      </ul>
+    </div>
+    <div>
+      <h5>Company</h5>
+      <ul>
+        <li><a href="#">About</a></li>
+        <li><a href="#">Contact</a></li>
+      </ul>
+    </div>
+    <div>
+      <h5>Legal</h5>
+      <ul>
+        <li><a href="#">Privacy</a></li>
+        <li><a href="#">Terms</a></li>
+      </ul>
+    </div>
+  </footer>
+  <div class="foot-bottom">
+    <span>© 2026 AMEARF Inc. · parent of Arbiter · 47.514°N, −122.196°E</span>
+    <span>builds: 7c4f1ae · region: eu-west-2 · gCO₂/req: 0.018</span>
+  </div>
+
+  <div class="ascii-coord" id="coord"></div>
+
+  <!-- ============== Tweaks panel slot ============== -->
+  <div id="tweaks-root"></div>
+
+  <!-- ============== Animation Engine ============== -->
+  <script>
+  (function() {
+    'use strict';
+
+    /* ------------- Counter ------------- */
+    const valueEl = document.getElementById('savingsValue');
+    let target = 428194;
+    function tickCounter() {
+      // gentle drift upward
+      target += 8 + Math.random() * 32;
+      const display = Math.round(target).toLocaleString('en-US');
+      valueEl.textContent = display;
+    }
+    setInterval(tickCounter, 1200);
+
+    /* ------------- Orchestrator ------------- */
+    (function orchestrator() {
+      const dimList = document.getElementById('dimList');
+      if (!dimList) return;
+      const dims = [...dimList.querySelectorAll('li')];
+      const progressEl = document.getElementById('dimProgress');
+      const jobIdEl = document.getElementById('jobId');
+      const jobTokensEl = document.getElementById('jobTokens');
+      const jobCard = document.getElementById('jobCard');
+      const jobStatus = document.getElementById('jobStatus');
+      const routeLines = [...document.querySelectorAll('#routeLines .route-line')];
+      const routeNodes = [...document.querySelectorAll('#routeNodes .node')];
+      const routeFlow = document.getElementById('routeFlow');
+      const tDecision = document.getElementById('tDecision');
+      const tDecisionMeta = document.getElementById('tDecisionMeta');
+      const tSavings = document.getElementById('tSavings');
+      const tSavingsPct = document.getElementById('tSavingsPct');
+      const tLatency = document.getElementById('tLatency');
+      const tLatencyBar = document.getElementById('tLatencyBar');
+      const tCarbon = document.getElementById('tCarbon');
+      const tCarbonBar = document.getElementById('tCarbonBar');
+      const orchClock = document.getElementById('orchClock');
+
+      const scenarios = [
+        { id: 421, route: 1, vals: ['CoreWeave','fra · eu-central','42ms','0.18','bf16','$0.94/M'], lat: 42, latPct: 0.32, carbon: 1.8, carbonPct: 0.22, savings: 187, savingsPct: 38.4, model: 'llama-3.1-70b-instruct', tokens: '2.41M' },
+        { id: 422, route: 0, vals: ['Lambda','sfo · us-west','58ms','0.31','fp8','$1.12/M'],     lat: 58, latPct: 0.45, carbon: 3.1, carbonPct: 0.42, savings: 96,  savingsPct: 24.7, model: 'mixtral-8x22b', tokens: '0.91M' },
+        { id: 423, route: 1, vals: ['CoreWeave','fra · eu-central','38ms','0.14','bf16','$0.88/M'], lat: 38, latPct: 0.28, carbon: 1.4, carbonPct: 0.18, savings: 241, savingsPct: 41.2, model: 'qwen-2.5-72b', tokens: '3.07M' },
+        { id: 424, route: 2, vals: ['AWS','iad · us-east','71ms','0.27','fp16','$1.02/M'],         lat: 71, latPct: 0.58, carbon: 2.6, carbonPct: 0.36, savings: 134, savingsPct: 31.0, model: 'llama-3.1-8b', tokens: '5.62M' },
+      ];
+      let scenarioIdx = 0;
+      const phaseDur = 380;
+
+      function setNodeStates(activeIdx) {
+        routeLines.forEach((ln, i) => {
+          ln.classList.remove('is-active','is-cand','is-rej');
+          if (i === activeIdx) ln.classList.add('is-active');
+          else ln.classList.add('is-rej');
+        });
+        routeNodes.forEach((nd, i) => {
+          nd.classList.remove('is-active','is-cand','is-rej');
+          if (i === activeIdx) nd.classList.add('is-active');
+          else nd.classList.add('is-rej');
+        });
+        if (routeFlow) {
+          const targetPath = routeLines[activeIdx].getAttribute('d');
+          routeFlow.setAttribute('d', targetPath);
+          routeFlow.classList.add('is-on');
+        }
+      }
+      function clearNodeStates() {
+        routeLines.forEach(ln => ln.classList.remove('is-active','is-cand','is-rej'));
+        routeNodes.forEach(nd => nd.classList.remove('is-active','is-cand','is-rej'));
+        if (routeFlow) routeFlow.classList.remove('is-on');
+      }
+
+      function tweenNumber(el, from, to, dur, fmt) {
+        const start = performance.now();
+        function step(now) {
+          const t = Math.min(1, (now - start) / dur);
+          const eased = 1 - Math.pow(1 - t, 3);
+          const v = from + (to - from) * eased;
+          el.textContent = fmt ? fmt(v) : v.toFixed(0);
+          if (t < 1) requestAnimationFrame(step);
+        }
+        requestAnimationFrame(step);
+      }
+
+      async function runScenario(s) {
+        // Reset
+        dims.forEach(li => {
+          li.classList.remove('is-active','is-done');
+          li.querySelector('.dim-v').textContent = '—';
+        });
+        progressEl.style.width = '0%';
+        clearNodeStates();
+        tDecision.textContent = '— —';
+        tDecisionMeta.textContent = 'evaluating';
+        jobStatus.classList.remove('is-routing');
+        jobStatus.querySelector('span:last-child').textContent = 'received · awaiting decision';
+
+        // Update job
+        jobIdEl.style.opacity = '0';
+        await sleep(160);
+        jobIdEl.textContent = 'inference-job-' + s.id;
+        jobTokensEl.textContent = s.tokens;
+        jobIdEl.style.opacity = '1';
+        jobCard.classList.add('is-active');
+
+        // Mark candidate routes (a few highlighted briefly during eval)
+        await sleep(300);
+        [s.route, (s.route + 1) % 4, (s.route + 3) % 4].forEach(i => {
+          routeLines[i].classList.add('is-cand');
+          routeNodes[i].classList.add('is-cand');
+        });
+
+        // Sequential dimension evaluation
+        for (let i = 0; i < dims.length; i++) {
+          dims[i].classList.add('is-active');
+          progressEl.style.width = ((i + 1) / dims.length * 100) + '%';
+          await sleep(phaseDur);
+          dims[i].querySelector('.dim-v').textContent = s.vals[i];
+          dims[i].classList.remove('is-active');
+          dims[i].classList.add('is-done');
+          await sleep(120);
+        }
+
+        // Decision
+        await sleep(260);
+        setNodeStates(s.route);
+        jobStatus.classList.add('is-routing');
+        jobStatus.querySelector('span:last-child').textContent = 'rerouted · ' + s.vals[0].toLowerCase() + ' · ' + s.vals[1].split(' · ')[0];
+        tDecision.textContent = s.vals[0];
+        tDecisionMeta.textContent = s.vals[1];
+
+        // Telemetry tweens
+        const prevSavings = parseFloat(tSavings.textContent.replace(/,/g,'')) || 0;
+        tweenNumber(tSavings, prevSavings, s.savings, 900, v => Math.round(v).toLocaleString());
+        tSavingsPct.textContent = s.savingsPct.toFixed(1) + '%';
+        const prevLat = parseFloat(tLatency.textContent) || 60;
+        tweenNumber(tLatency, isNaN(prevLat) ? 60 : prevLat, s.lat, 800, v => v.toFixed(0));
+        tLatencyBar.style.width = (s.latPct * 100) + '%';
+        const prevCarb = parseFloat(tCarbon.textContent) || 2.5;
+        tweenNumber(tCarbon, isNaN(prevCarb) ? 2.5 : prevCarb, s.carbon, 800, v => v.toFixed(2));
+        tCarbonBar.style.width = (s.carbonPct * 100) + '%';
+
+        await sleep(2600);
+        jobCard.classList.remove('is-active');
+      }
+
+      function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+      async function loop() {
+        while (true) {
+          await runScenario(scenarios[scenarioIdx % scenarios.length]);
+          scenarioIdx++;
+          await sleep(700);
+        }
+      }
+      loop();
+
+      // Clock
+      function tickClock() {
+        const d = new Date();
+        const pad = n => String(n).padStart(2, '0');
+        orchClock.textContent = pad(d.getHours()) + ' : ' + pad(d.getMinutes()) + ' : ' + pad(d.getSeconds()) + ' UTC';
+      }
+      tickClock();
+      setInterval(tickClock, 1000);
+    })();
+
+    /* ------------- Sub stats drift ------------- */
+    const co2 = document.getElementById('co2Val');
+    const kwh = document.getElementById('kwhVal');
+    const tok = document.getElementById('tokVal');
+    let co2v = 11842, kwhv = 38.2, tokv = 12.7;
+    setInterval(() => {
+      co2v += Math.random() * 6;
+      kwhv += Math.random() * 0.04;
+      tokv += Math.random() * 0.02;
+      co2.firstChild.nodeValue = Math.round(co2v).toLocaleString('en-US');
+      kwh.firstChild.nodeValue = kwhv.toFixed(1);
+      tok.firstChild.nodeValue = tokv.toFixed(1) + 'M';
+    }, 1500);
+
+    /* ------------- Live chart ------------- */
+    const optPath = document.getElementById('optPath');
+    const optArea = document.getElementById('optArea');
+    const basePath = document.getElementById('basePath');
+    const liveDot = document.getElementById('liveDot');
+    const liveDotPulse = document.getElementById('liveDotPulse');
+
+    const W = 600, H = 180;
+    const left = 48, right = 600, top_ = 18, bot = 156;
+    const N = 80;
+    let series = [];
+    let baseSeries = [];
+    // initial fill
+    for (let i = 0; i < N; i++) {
+      const phase = i / N;
+      const baseY = bot - (Math.sin(phase * 4) * 6 + 28 + Math.random() * 4);
+      const optY = bot - (Math.sin(phase * 3 + 1) * 8 + 76 + Math.random() * 8);
+      baseSeries.push(baseY);
+      series.push(optY);
+    }
+
+    function pathFor(arr) {
+      const step = (right - left) / (arr.length - 1);
+      let d = '';
+      arr.forEach((y, i) => {
+        const x = left + step * i;
+        d += (i === 0 ? 'M' : 'L') + x.toFixed(1) + ' ' + y.toFixed(1) + ' ';
+      });
+      return d.trim();
+    }
+    function areaFor(arr) {
+      const step = (right - left) / (arr.length - 1);
+      let d = '';
+      arr.forEach((y, i) => {
+        const x = left + step * i;
+        d += (i === 0 ? 'M' : 'L') + x.toFixed(1) + ' ' + y.toFixed(1) + ' ';
+      });
+      d += 'L' + right + ' ' + bot + ' L' + left + ' ' + bot + ' Z';
+      return d;
+    }
+
+    let pulseT = 0;
+    function drawChart() {
+      // shift left
+      series.shift();
+      baseSeries.shift();
+      const last = series[series.length - 1];
+      const lastBase = baseSeries[baseSeries.length - 1];
+      // smooth random walk
+      const newBase = Math.max(top_ + 30, Math.min(bot - 6, lastBase + (Math.random() - 0.5) * 4));
+      const newOpt  = Math.max(top_ + 80, Math.min(bot - 4, last + (Math.random() - 0.5) * 6));
+      series.push(newOpt);
+      baseSeries.push(newBase);
+
+      basePath.setAttribute('d', pathFor(baseSeries));
+      optPath.setAttribute('d', pathFor(series));
+      optArea.setAttribute('d', areaFor(series));
+      liveDot.setAttribute('cx', right);
+      liveDot.setAttribute('cy', newOpt);
+      liveDotPulse.setAttribute('cx', right);
+      liveDotPulse.setAttribute('cy', newOpt);
+
+      pulseT = (pulseT + 1) % 18;
+      const r = 4 + (pulseT / 18) * 12;
+      const op = 0.7 - (pulseT / 18) * 0.7;
+      liveDotPulse.setAttribute('r', r.toFixed(1));
+      liveDotPulse.setAttribute('opacity', op.toFixed(2));
+    }
+    setInterval(drawChart, 90);
+    // initial draw
+    basePath.setAttribute('d', pathFor(baseSeries));
+    optPath.setAttribute('d', pathFor(series));
+    optArea.setAttribute('d', areaFor(series));
+
+    /* ------------- Stream log ------------- */
+    const streamList = document.getElementById('streamList');
+    const MODELS = [
+      ['gpt-4o-mini', 'iad-1'],
+      ['claude-haiku', 'dub-2'],
+      ['llama-3.1-70b', 'gru-1'],
+      ['mistral-small', 'cdg-1'],
+      ['gemini-flash', 'iad-3'],
+      ['deepseek-v3', 'sin-1'],
+      ['llama-3.2-8b', 'fra-1']
+    ];
+    const ACTIONS = [
+      'route → ', 'cache hit → ', 'route → ', 'route → ', 'verify ✓ ', 'route → '
+    ];
+
+    function pad(n, w) { return String(n).padStart(w, '0'); }
+    function timeStr() {
+      const d = new Date();
+      return pad(d.getHours(), 2) + ':' + pad(d.getMinutes(), 2) + ':' + pad(d.getSeconds(), 2);
+    }
+    function pushStream() {
+      const m = MODELS[Math.floor(Math.random() * MODELS.length)];
+      const a = ACTIONS[Math.floor(Math.random() * ACTIONS.length)];
+      const save = (Math.random() * 92 + 8).toFixed(1);
+      const li = document.createElement('li');
+      li.innerHTML =
+        '<span class="t">' + timeStr() + '</span>' +
+        '<span class="m">' + a + '</span>' +
+        '<span>' + m[0] + ' <span style="color:var(--ink-4)">@ ' + m[1] + '</span></span>' +
+        '<span class="save">−' + save + '%</span>';
+      streamList.insertBefore(li, streamList.firstChild);
+      // cap
+      while (streamList.children.length > 6) {
+        streamList.removeChild(streamList.lastChild);
+      }
+    }
+    for (let i = 0; i < 5; i++) pushStream();
+    setInterval(pushStream, 800 + Math.random() * 800);
+
+    /* ------------- variance scatter ------------- */
+    const dotsG = document.getElementById('varianceDots');
+    if (dotsG) {
+      const colors = ['#7CFFB2','#9affc7','#4ea878'];
+      const W2 = 600, H2 = 220, cx = 300;
+      function gauss() { let u=0,v=0; while(u===0)u=Math.random(); while(v===0)v=Math.random(); return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v); }
+      let html = '';
+      for (let i = 0; i < 180; i++) {
+        const variance = gauss() * 0.09; // ~9% std dev
+        const x = cx + variance * (W2-80) * 2;
+        const y = 30 + Math.random() * 160;
+        const c = colors[i % 3];
+        const r = 1.6 + Math.random() * 1.8;
+        html += '<circle cx="'+x.toFixed(1)+'" cy="'+y.toFixed(1)+'" r="'+r.toFixed(1)+'" fill="'+c+'" opacity="'+(0.3+Math.random()*0.5).toFixed(2)+'"/>';
+      }
+      dotsG.innerHTML = html;
+    }
+
+    /* ------------- coordinate readout (cute footer) ------------- */
+    const coord = document.getElementById('coord');
+    document.addEventListener('mousemove', (e) => {
+      coord.textContent =
+        'x:' + pad(e.clientX, 4) + ' y:' + pad(e.clientY, 4) +
+        ' · region:eu-west-2 · gCO₂e: 0.018';
+    });
+    coord.textContent = 'x:0000 y:0000 · region:eu-west-2 · gCO₂e: 0.018';
+  })();
+  </script>
+
+  <!-- ============== React + Tweaks ============== -->
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <script type="text/babel" src="tweaks-panel.jsx"></script>
+  <script type="text/babel" src="tweaks.jsx"></script>
+
+</body>
+</html>
