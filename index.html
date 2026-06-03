@@ -1573,6 +1573,70 @@
     }
   </style>
 </head>
+<script>
+  const ARBITER_API = 'https://YOUR-DEPLOYED-BACKEND-URL';
+
+  // CTA form — waitlist
+  const ctaForm = document.querySelector('.cta-form');
+  const ctaInput = ctaForm?.querySelector('input[type="email"]');
+  const ctaBtn = ctaForm?.querySelector('button[type="submit"]');
+
+  if (ctaForm) {
+    ctaForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = ctaInput?.value?.trim();
+      if (!email) return;
+
+      ctaBtn.disabled = true;
+      ctaBtn.textContent = 'Joining...';
+
+      try {
+        const res = await fetch(`${ARBITER_API}/api/v1/waitlist`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, source: 'landing_page' })
+        });
+
+        if (res.ok) {
+          ctaForm.innerHTML = `
+            <p style="
+              font-family: 'JetBrains Mono', monospace;
+              font-size: 12px;
+              color: #7CFFB2;
+              letter-spacing: 0.08em;
+              padding: 16px;
+            ">You're on the list. We'll be in touch.</p>
+          `;
+        } else {
+          ctaBtn.disabled = false;
+          ctaBtn.textContent = 'Run shadow mode →';
+          ctaInput.style.borderColor = '#ff7a6b';
+        }
+      } catch (err) {
+        ctaBtn.disabled = false;
+        ctaBtn.textContent = 'Run shadow mode →';
+      }
+    });
+  }
+
+  // Top nav — Sign in → link to web app
+  document.querySelectorAll('.btn-ghost').forEach(btn => {
+    if (btn.textContent.includes('Sign in')) {
+      btn.addEventListener('click', () => {
+        window.location.href = `${ARBITER_API.replace('/api/v1','')}/login`;
+      });
+    }
+  });
+
+  // Top nav — Run Shadow Mode → link to register
+  document.querySelectorAll('.btn-primary').forEach(btn => {
+    if (btn.textContent.includes('Run Shadow Mode')) {
+      btn.addEventListener('click', () => {
+        window.location.href = `${ARBITER_API.replace('/api/v1','')}/register`;
+      });
+    }
+  });
+</script>
 <body>
   <!-- ===================== ATMOSPHERIC ENTRY LAYER ===================== -->
   <div id="arbiter-entry-spacer" style="height: 350vh; width: 100vw; position: relative; pointer-events: none; z-index: 0;"></div>
