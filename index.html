@@ -1646,7 +1646,7 @@
     <canvas id="thermalCanvas" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1;"></canvas>
     
     <div id="arbiter-center-text" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 10; font-family: var(--serif, 'Fraunces', serif); font-size: 22px; font-weight: 300; letter-spacing: 0.12em; color: #fff; text-transform: uppercase; transition: opacity 0.2s, transform 0.2s; opacity: 0.6; text-shadow: 0 4px 12px rgba(0,0,0,0.5);">
-      Arbiter
+      Arbiter Cloud
     </div>
 
     <!-- HUD LOGS -->
@@ -1706,9 +1706,12 @@
           
           for(let y=0; y<rows; y++) {
               for(let x=0; x<cols; x++) {
-                  // Make space for the central Arbiter text
-                  let dist = Math.hypot(x - cx, y - cy);
-                  if (dist < 3.5) continue; 
+                  // Make space for the central 'Arbiter Cloud' text (Wide Oval Cutout)
+                  let dx = x - cx;
+                  let dy = y - cy;
+                  // Multiply dy to squash the circle into an oval that is wider than it is tall
+                  let dist = Math.hypot(dx, dy * 2.5);
+                  if (dist < 5.0) continue; 
                   
                   cells.push({
                       x: x, y: y,
